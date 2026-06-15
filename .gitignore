@@ -1,0 +1,24 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Claude Code 本地设置（机器相关，不入库；项目级 skills 仍提交）
+.claude/settings.local.json
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
