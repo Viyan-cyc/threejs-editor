@@ -17,12 +17,12 @@ function createSolarPanel(): THREE.Group {
   const panel = new THREE.Group();
 
   // 板面：深蓝玻璃，微反光
-  const surface = box({ w: 1.6, h: 0.06, d: 1.0, color: 0x14233f, roughness: 0.25, metalness: 0.55 });
+  const surface = box({ w: 1.6, h: 0.06, d: 1.0, color: 0x14233f, roughness: 0.25, metalness: 0.55, name: 'panel.surface' });
   surface.position.y = 0.9;
   panel.add(surface);
 
   // 边框：略大的薄扁盒子，贴在板面下方
-  const frame = box({ w: 1.66, h: 0.05, d: 1.06, color: 0x3a4a5a, roughness: 0.6, metalness: 0.3 });
+  const frame = box({ w: 1.66, h: 0.05, d: 1.06, color: 0x3a4a5a, roughness: 0.6, metalness: 0.3, name: 'panel.frame' });
   frame.position.y = 0.86;
   panel.add(frame);
 
@@ -35,13 +35,14 @@ function createSolarPanel(): THREE.Group {
     segments: 6,
     roughness: 0.6,
     metalness: 0.3,
+    name: 'panel.leg',
   });
   leg.position.set(0, 0.45, 0.3);
   leg.rotation.x = THREE.MathUtils.degToRad(15);
   panel.add(leg);
 
   // 底座小盒
-  const base = box({ w: 0.3, h: 0.08, d: 0.5, color: 0x6a737d, roughness: 0.7 });
+  const base = box({ w: 0.3, h: 0.08, d: 0.5, color: 0x6a737d, roughness: 0.7, name: 'panel.base' });
   base.position.set(0, 0.04, 0.35);
   panel.add(base);
 
@@ -74,6 +75,7 @@ export class SolarPanelFieldBuilder implements ObjectBuilder {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const panel = template.clone(true);
+        panel.name = `solar-panel.r${r}c${c}`;
         panel.position.set(c * spacing - offsetX, 0, r * spacing - offsetZ);
         panel.rotation.x = tilt;
         group.add(panel);

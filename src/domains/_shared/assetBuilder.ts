@@ -15,6 +15,7 @@ export function makeAssetBuilder(
     type,
     async build(_node, ctx) {
       const obj = await ctx.modelFactory.load(assetKey);
+      obj.name = `asset:${assetKey}`;
       if (opts.scale) obj.scale.setScalar(opts.scale);
       return obj;
     },
