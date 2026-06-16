@@ -105,5 +105,36 @@ export interface SceneDSL {
   notes?: string[];
 }
 
+/** 通用几何基本形状（清单外对象的兜底渲染用）。 */
+export type ShapeKind = 'box' | 'cylinder' | 'sphere' | 'cone';
+
+/** 通用几何的一个部件（组合体的组成部分）。 */
+export interface GenericShapePart {
+  shape: ShapeKind;
+  /** box 的 [宽, 高, 深] */
+  size?: [number, number, number];
+  /** cylinder/sphere/cone 半径 */
+  radius?: number;
+  /** cylinder/cone 高度 */
+  height?: number;
+  color?: ColorDSL;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
+}
+
+/**
+ * 通用几何参数 —— 当 SceneObjectDSL.type 不在任何领域的 builder 清单里时，
+ * 由通用几何 builder（GenericShapeBuilder）按此参数渲染简化 low-poly。
+ * 有 parts 时按组合体渲染（忽略顶层单 shape）。
+ */
+export interface GenericShapeParams {
+  shape?: ShapeKind;
+  size?: [number, number, number];
+  radius?: number;
+  height?: number;
+  color?: ColorDSL;
+  parts?: GenericShapePart[];
+}
+
 /** 当前 DSL 版本，供演进与校验使用。 */
 export const SCENE_DSL_VERSION = '1';

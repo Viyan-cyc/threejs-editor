@@ -2,6 +2,7 @@ import type { DomainKind, SceneDSL } from '../../core/dsl/types';
 import type { LLMAdapter } from '../adapter/LLMAdapter';
 import type { PromptBuilder } from '../prompt/PromptBuilder';
 import type { GenerateOptions } from '../types';
+import { normalizeSceneDSL } from './normalizeDSL';
 
 /**
  * SceneGenerationOrchestrator —— 编排「自然语言 → SceneDSL」。
@@ -20,8 +21,8 @@ export class SceneGenerationOrchestrator {
 
   async generate(naturalLanguage: string, domain: DomainKind, opts?: GenerateOptions): Promise<SceneDSL> {
     const prompt = this.promptBuilder.build(domain, naturalLanguage);
-    const dsl = await this.adapter.generateScene(prompt, opts);
-    // TODO: validate(dsl) —— 校验/补全字段，失败抛错或降级
-    return dsl;
+    const raw = await this.adapter.generateScene(prompt, opts);
+    // 规范化字段（version/domain 兜底、notes→string[]、数组兜底）。更严格的 schema 校验为后续 TODO。
+    return normalizeSceneDSL(raw, domain);
   }
 }

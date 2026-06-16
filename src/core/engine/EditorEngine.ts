@@ -13,7 +13,8 @@ import {
 import { DomainRegistry } from '../registry/DomainRegistry';
 import type { EditorContext } from '../registry/EditorContext';
 import { SceneBuilder } from '../scene/SceneBuilder';
-import { MockLLMAdapter } from '../../ai/adapter/MockLLMAdapter';
+import { createLLMAdapter } from '../../ai/adapter';
+import { appConfig } from '../../config/app.config';
 import { PromptBuilder } from '../../ai/prompt/PromptBuilder';
 import { SceneGenerationOrchestrator } from '../../ai/orchestrator/SceneGenerationOrchestrator';
 import { DOMAINS } from '../../config/domains.config';
@@ -26,7 +27,7 @@ import type { DomainKind, SceneDSL } from '../dsl/types';
  *  - three 层：Renderer / CameraRig / SceneManager；
  *  - capabilities：AssetRegistry → ModelFactory、Lighting/Environment/Camera/Animation manager；
  *  - registry：注册 config 中的全部领域；
- *  - ai：MockLLMAdapter（默认）+ PromptBuilder + Orchestrator；
+ *  - ai：LLMAdapter（按 appConfig.llm.adapter 选 glm/mock）+ PromptBuilder + Orchestrator；
  *  - 把 capabilities 聚合为 EditorContext，交给 SceneBuilder。
  *
  * 渲染循环在 loop()，由 UI 层 attach(canvas) 后 start()。
@@ -79,7 +80,7 @@ export class EditorEngine {
     this.sceneBuilder = new SceneBuilder(this.domains, this.ctx);
 
     const promptBuilder = new PromptBuilder(this.domains);
-    const adapter = new MockLLMAdapter(); // TODO: 接真实 LLM 时替换此处
+    const adapter = createLLMAdapter(appConfig.llm); // 'glm'（真实模型，走 vite proxy）| 'mock'
     this.orchestrator = new SceneGenerationOrchestrator(adapter, promptBuilder);
   }
 

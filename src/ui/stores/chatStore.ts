@@ -35,7 +35,12 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const dsl = await editor.generate(content);
-      push('assistant', dsl?.notes?.join('\n') ?? '场景已生成。');
+      if (dsl) {
+        // notes 已被 normalizeSceneDSL 规范为 string[]
+        push('assistant', dsl.notes?.join('\n') || '场景已生成。');
+      } else {
+        push('assistant', '生成失败：' + (editor.error ?? '未知错误'));
+      }
     } catch (e) {
       push('assistant', '生成失败：' + (e as Error).message);
     }

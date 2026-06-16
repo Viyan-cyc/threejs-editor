@@ -2,6 +2,10 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 # Claude Code 本地设置（机器相关，不入库；项目级 skills 仍提交）
 .claude/settings.local.json
