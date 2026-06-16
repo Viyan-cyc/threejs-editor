@@ -12,7 +12,7 @@ export const appConfig = {
     glm: {
       // vite proxy 同源路径，见 vite.config.ts 的 server.proxy['/llm']
       endpoint: '/llm/api/coding/paas/v4/chat/completions',
-      model: import.meta.env.VITE_GLM_MODEL ?? 'glm-4.6',
+      model: import.meta.env.VITE_GLM_MODEL ?? 'glm-5.1',
       apiKey: import.meta.env.VITE_GLM_API_KEY ?? '',
       temperature: 0.6,
     } satisfies GlmConfig,

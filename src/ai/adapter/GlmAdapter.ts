@@ -9,7 +9,7 @@ export interface GlmConfig {
   endpoint: string;
   /** API Key（经 VITE_GLM_API_KEY 注入）。未配置时构造即抛错。 */
   apiKey: string;
-  /** 模型 ID，默认 glm-4.6；可经 VITE_GLM_MODEL 覆盖 */
+  /** 模型 ID，默认 glm-5.1；可经 VITE_GLM_MODEL 覆盖 */
   model: string;
   /** 采样温度，默认 0.6 */
   temperature?: number;
