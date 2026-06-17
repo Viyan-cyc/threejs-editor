@@ -14,14 +14,13 @@ export function mockSceneFor(domain: DomainKind): SceneDSL {
         title: '光伏电站（示例）',
         environment: { preset: 'sunny', background: true, backgroundColor: '#9ec9ff' },
         camera: { position: [34, 24, 34], target: [0, 0, 0], fov: 50 },
-        cameraAnimation: { type: 'orbit', loop: true, target: [0, 0, 0], radius: 38, height: 22 },
         lights: [
           { type: 'hemisphere', intensity: 0.6 },
           { type: 'directional', intensity: 1.3, position: [24, 32, 12], castShadow: true },
         ],
         objects: [
           {
-            type: 'solar-panel-array',
+          type: 'solar-panel-array',
             name: '主光伏阵列',
             transform: { position: [0, 0, 0] },
             params: { rows: 6, cols: 10, tilt: 30, spacing: 2.4 },
@@ -42,7 +41,6 @@ export function mockSceneFor(domain: DomainKind): SceneDSL {
         title: '工业园区（示例）',
         environment: { preset: 'city', background: true, backgroundColor: '#cfd8e3' },
         camera: { preset: 'iso', target: [0, 2, 0] },
-        cameraAnimation: { type: 'orbit', loop: true, target: [0, 2, 0], radius: 36, height: 18 },
         lights: [
           { type: 'hemisphere', intensity: 0.7 },
           { type: 'directional', intensity: 1.1, position: [20, 30, 10], castShadow: true },
@@ -60,7 +58,6 @@ export function mockSceneFor(domain: DomainKind): SceneDSL {
         title: '通信基站（示例）',
         environment: { preset: 'sunset', background: true, backgroundColor: '#f3b88c' },
         camera: { position: [14, 10, 16], target: [0, 6, 0], fov: 50 },
-        cameraAnimation: { type: 'orbit', loop: true, target: [0, 6, 0], radius: 20, height: 12 },
         lights: [
           { type: 'hemisphere', intensity: 0.6 },
           { type: 'directional', intensity: 1.0, position: [16, 24, 8], castShadow: true },
@@ -78,7 +75,6 @@ export function mockSceneFor(domain: DomainKind): SceneDSL {
         title: '智能家居（示例）',
         environment: { preset: 'studio', background: true, backgroundColor: '#eef1f4' },
         camera: { position: [8, 6, 9], target: [0, 1, 0], fov: 55 },
-        cameraAnimation: { type: 'orbit', loop: true, target: [0, 1, 0], radius: 12, height: 7 },
         lights: [
           { type: 'ambient', intensity: 0.5 },
           { type: 'point', intensity: 0.8, position: [0, 4, 0] },

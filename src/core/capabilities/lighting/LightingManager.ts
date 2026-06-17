@@ -7,8 +7,14 @@ export class LightingManager {
 
   constructor(private readonly scene: THREE.Scene) {}
 
-  /** 批量应用，返回已创建灯光。 */
+  /** 批量应用，返回已创建灯光。lights 为空时兜底加一盏柔和环境光，避免场景（PBR 材质）全黑。 */
   apply(lights: LightDSL[] = []): THREE.Light[] {
+    if (lights.length === 0) {
+      const fallback = new THREE.AmbientLight(0xffffff, 0.4);
+      this.scene.add(fallback);
+      this.created.push(fallback);
+      return [fallback];
+    }
     return lights.map((l) => this.add(l));
   }
 

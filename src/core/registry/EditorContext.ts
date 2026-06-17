@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { ModelFactory } from '../capabilities/models/ModelFactory';
+import type { HunyuanModelGenerator } from '../capabilities/hunyuan/HunyuanModelGenerator';
 import type { LightingManager } from '../capabilities/lighting/LightingManager';
 import type { EnvironmentManager } from '../capabilities/environment/EnvironmentManager';
 import type { CameraAnimator } from '../capabilities/camera/CameraAnimator';
@@ -15,10 +16,14 @@ export interface EditorContext {
   scene: THREE.Scene;
   /** 模型生成（资产库加载） */
   modelFactory: ModelFactory;
+  /** 混元3D 运行时高精度生成（清单外对象） */
+  hunyuan: HunyuanModelGenerator;
   /** 灯光 */
   lighting: LightingManager;
   /** 环境贴图 */
   environment: EnvironmentManager;
   /** 摄像头动画 */
   camera: CameraAnimator;
+  /** 进度回调：SceneBuilder 生成对象（尤其耗时的混元生成）时调用，UI 层接线显示文案 */
+  onProgress?: (text: string) => void;
 }

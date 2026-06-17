@@ -90,6 +90,11 @@ export interface SceneObjectDSL {
   transform?: TransformDSL;
   /** 领域专属参数，原样透传给 builder */
   params?: Record<string, unknown>;
+  /**
+   * 清单外对象触发混元3D高精度生成；无此字段则走通用几何 lowPoly 兜底。
+   * 仅当 type 不在任何领域的 builder 清单里时生效。
+   */
+  generate?: GenerateDSL;
   children?: SceneObjectDSL[];
 }
 
@@ -164,6 +169,23 @@ export interface GenericShapeParams {
   height?: number;
   color?: ColorDSL;
   parts?: GenericShapePart[];
+}
+
+/**
+ * 清单外对象触发高精度 3D 模型生成（腾讯混元3D）。
+ * 有 generate 字段时，SceneBuilder 走混元生成而非通用几何兜底；生成失败再降级 lowPoly。
+ */
+export interface GenerateDSL {
+  /** 中文生成描述，越具体越好（物体类型/材质/颜色/关键细节）。最多 1024 字符。 */
+  prompt: string;
+  /** 混元模型版本，默认 3.0。3.1 不支持 LowPoly。 */
+  model?: '3.0' | '3.1';
+  /** 开启 PBR 材质，默认 true。 */
+  enablePbr?: boolean;
+  /** 面数，默认 500000，范围 10000~1500000。 */
+  faceCount?: number;
+  /** 生成类型：Normal / LowPoly / Geometry / Sketch，默认 Normal。 */
+  generateType?: 'Normal' | 'LowPoly' | 'Geometry' | 'Sketch';
 }
 
 /** 当前 DSL 版本，供演进与校验使用。 */

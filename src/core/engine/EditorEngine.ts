@@ -5,6 +5,7 @@ import { SceneManager } from '../../three/SceneManager';
 import {
   AssetRegistry,
   ModelFactory,
+  HunyuanModelGenerator,
   LightingManager,
   EnvironmentManager,
   CameraAnimator,
@@ -46,6 +47,7 @@ export class EditorEngine {
 
   readonly assetRegistry: AssetRegistry;
   readonly modelFactory: ModelFactory;
+  readonly hunyuan: HunyuanModelGenerator;
   readonly lighting: LightingManager;
   readonly environment: EnvironmentManager;
   readonly cameraAnimator: CameraAnimator;
@@ -77,6 +79,7 @@ export class EditorEngine {
 
     this.assetRegistry = new AssetRegistry();
     this.modelFactory = new ModelFactory(this.assetRegistry);
+    this.hunyuan = new HunyuanModelGenerator();
     this.lighting = new LightingManager(this.sceneManager.scene);
     this.environment = new EnvironmentManager(this.sceneManager.scene, this.renderer.instance);
     this.cameraAnimator = new CameraAnimator(this.rig); // CameraRig 实现 CameraRigPort
@@ -88,9 +91,11 @@ export class EditorEngine {
     this.ctx = {
       scene: this.sceneManager.scene,
       modelFactory: this.modelFactory,
+      hunyuan: this.hunyuan,
       lighting: this.lighting,
       environment: this.environment,
       camera: this.cameraAnimator,
+      onProgress: undefined,
     };
 
     this.sceneBuilder = new SceneBuilder(this.domains, this.ctx);
@@ -161,6 +166,12 @@ export class EditorEngine {
     this.lighting.clear();
     this.environment.clear();
   }
+
+  /** 注入进度回调：SceneBuilder 生成对象（混元等耗时步骤）时回传文案，由 UI 层接线显示。 */
+  setProgressHandler(fn: (text: string) => void): void {
+    this.ctx.onProgress = fn;
+  }
+
 
   /**
    * 用 DSL 应用场景。

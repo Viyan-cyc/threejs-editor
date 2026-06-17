@@ -56,7 +56,7 @@ export class SceneBuilder {
     const builder = domain.builders.find((b) => b.type === node.type);
     const obj = builder
       ? await builder.build(node, this.ctx)
-      : this.buildGeneric(node); // 清单外：通用几何兜底（简化模型）
+      : await this.buildGeneric(node); // 清单外：混元生成或通用几何兜底
 
     applyTransform(obj, node.transform);
     if (node.name) obj.name = node.name;
@@ -70,8 +70,18 @@ export class SceneBuilder {
     return obj;
   }
 
-  /** 清单外对象的通用几何兜底（简化 low-poly）。 */
-  private buildGeneric(node: SceneObjectDSL): THREE.Object3D {
+  /** 清单外对象：有 generate.prompt 走混元高精度生成；无 prompt 或生成失败则走通用几何 lowPoly 兜底。 */
+  private async buildGeneric(node: SceneObjectDSL): Promise<THREE.Object3D> {
+    if (node.generate?.prompt) {
+      try {
+        const obj = await this.ctx.hunyuan.generate(node.generate, node, this.ctx.onProgress);
+        void fetch('/hunyuan3d/diag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ where: 'buildGeneric-ok', type: node.type }) }).catch(() => {});
+        return obj;
+      } catch (err) {
+        void fetch('/hunyuan3d/diag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ where: 'buildGeneric-fail', type: node.type, error: (err as Error).message, stack: (err as Error).stack }) }).catch(() => {});
+        console.warn(`[SceneBuilder] 混元生成 "${node.type}" 失败，降级 lowPoly：`, err);
+      }
+    }
     console.warn(`[SceneBuilder] 未注册对象类型 "${node.type}"，使用通用几何兜底（简化模型）。`);
     return this.generic.build(node, this.ctx);
   }

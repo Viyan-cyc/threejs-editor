@@ -13,11 +13,16 @@ export const useEditorStore = defineStore('editor', () => {
   const currentDomain = ref<DomainKind>(appConfig.defaultDomain);
   const currentScene = ref<SceneDSL | null>(null);
   const loading = ref(false);
+  /** 生成期间的进度文案（如「正在生成：集装箱…」），由 EditorEngine.onProgress 回填 */
+  const loadingText = ref('');
   const error = ref<string | null>(null);
 
   function attach(canvas: HTMLCanvasElement): void {
     if (engine.value) return;
     const e = markRaw(new EditorEngine(canvas));
+    e.setProgressHandler((t) => {
+      loadingText.value = t;
+    });
     e.start();
     engine.value = e;
   }
@@ -43,6 +48,7 @@ export const useEditorStore = defineStore('editor', () => {
       return null;
     } finally {
       loading.value = false;
+      loadingText.value = '';
     }
   }
 
@@ -50,5 +56,5 @@ export const useEditorStore = defineStore('editor', () => {
     currentDomain.value = d;
   }
 
-  return { engine, currentDomain, currentScene, loading, error, attach, detach, generate, setDomain };
+  return { engine, currentDomain, currentScene, loading, loadingText, error, attach, detach, generate, setDomain };
 });

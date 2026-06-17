@@ -26,7 +26,7 @@ const domains: Array<{ id: DomainKind; label: string }> = [
         {{ d.label }}
       </button>
     </div>
-    <div class="toolbar__status">{{ editor.loading ? '生成中…' : '就绪' }}</div>
+    <div class="toolbar__status">{{ editor.loading ? (editor.loadingText || '生成中…') : '就绪' }}</div>
   </div>
 </template>
 

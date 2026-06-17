@@ -6,3 +6,4 @@ export * from './lighting/LightingManager';
 export * from './environment/EnvironmentManager';
 export * from './camera/CameraAnimator';
 export * from './animation/AnimationManager';
+export * from './hunyuan';

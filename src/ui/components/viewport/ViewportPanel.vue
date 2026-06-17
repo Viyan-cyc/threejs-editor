@@ -17,7 +17,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="viewport">
     <canvas ref="canvasRef" class="viewport__canvas"></canvas>
-    <div v-if="editor.loading" class="viewport__overlay">生成中…</div>
+    <div v-if="editor.loading" class="viewport__overlay">{{ editor.loadingText || '生成中…' }}</div>
     <div v-else-if="editor.error" class="viewport__overlay viewport__overlay--error">
       {{ editor.error }}
     </div>
