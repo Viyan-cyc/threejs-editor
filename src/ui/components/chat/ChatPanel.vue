@@ -33,20 +33,22 @@ function submit(): void {
     </div>
 
     <div class="chat__composer">
-      <select v-model="editor.currentDomain" class="chat__domain">
-        <option v-for="d in domains" :key="d.id" :value="d.id">{{ d.label }}</option>
-      </select>
-      <input
+      <div class="chat__row">
+        <select v-model="editor.currentDomain" class="chat__domain">
+          <option v-for="d in domains" :key="d.id" :value="d.id">{{ d.label }}</option>
+        </select>
+        <button class="chat__send" :disabled="editor.loading || !chat.input.trim()" @click="submit">
+          生成
+        </button>
+      </div>
+      <textarea
         v-model="chat.input"
         class="chat__input"
-        type="text"
+        rows="3"
         placeholder="描述你想生成的场景…（回车发送）"
         :disabled="editor.loading"
         @keydown.enter="submit"
       />
-      <button class="chat__send" :disabled="editor.loading || !chat.input.trim()" @click="submit">
-        生成
-      </button>
     </div>
   </div>
 </template>
@@ -88,30 +90,45 @@ function submit(): void {
 }
 .chat__composer {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   padding: 8px;
   border-top: 1px solid #e5e7eb;
 }
+.chat__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .chat__domain {
+  width: 84px;
+  box-sizing: border-box;
   border: 1px solid #d0d4da;
   border-radius: 4px;
-  padding: 0 6px;
+  padding: 4px 6px;
   background: #fff;
+  font-size: 13px;
 }
 .chat__input {
-  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   border: 1px solid #d0d4da;
   border-radius: 4px;
   padding: 6px 10px;
   font-size: 13px;
+  font-family: inherit;
+  resize: none;
 }
 .chat__send {
+  width: 84px;
+  box-sizing: border-box;
   border: none;
   background: #2f6fed;
   color: #fff;
   border-radius: 4px;
-  padding: 0 16px;
+  padding: 4px 16px;
   cursor: pointer;
+  font-size: 13px;
 }
 .chat__send:disabled {
   background: #9bb6e6;
