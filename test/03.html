@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>校园 3D 可视化场景</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14; }
+    #app { width: 100vw; height: 100vh; }
+    canvas { display: block; }
+
+    /* 左上角信息面板 */
+    .hud {
+      position: fixed; left: 16px; top: 16px; z-index: 10;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #e8eef6; background: rgba(13, 20, 30, 0.62);
+      backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.08);
+      padding: 14px 18px; border-radius: 12px; line-height: 1.7; font-size: 13px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.35); max-width: 260px;
+    }
+    .hud h1 { margin: 0 0 6px; font-size: 15px; font-weight: 600; letter-spacing: .5px; }
+    .hud p { margin: 0; opacity: .82; font-size: 12px; }
+    .hud .key { display:inline-block; min-width:54px; opacity:.6; }
+
+    /* 右上角工具栏按钮 */
+    .toolbar {
+      position: fixed; right: 16px; top: 16px; z-index: 10;
+      display: flex; gap: 10px;
+      font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .toolbar button {
+      cursor: pointer; font-size: 13px; color: #e8eef6;
+      background: rgba(13, 20, 30, 0.62);
+      backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.14);
+      padding: 10px 16px; border-radius: 10px; line-height: 1.4; white-space: nowrap;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+      transition: background .2s ease, transform .1s ease;
+    }
+    .toolbar button:hover { background: rgba(31, 46, 66, 0.85); }
+    .toolbar button:active { transform: translateY(1px); }
+
+    #loading {
+      position: fixed; inset: 0; display:flex; align-items:center; justify-content:center;
+      color:#cdd9e6; font-family: sans-serif; font-size: 14px; letter-spacing: 1px;
+      background:#0b0f14; z-index: 50; transition: opacity .6s ease;
+    }
+  </style>
+
+  <!-- Three.js ES Module importmap：从 CDN 引入，浏览器原生支持 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="hud">
+    <h1>🏫 校园 3D 可视化</h1>
+    <p><span class="key">左键拖拽</span>旋转视角</p>
+    <p><span class="key">右键拖拽</span>平移</p>
+    <p><span class="key">滚轮</span>缩放</p>
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-camera">正交视角 · 点击切换</button>
+    <button id="btn-daynight">白天模式 · 点击切换</button>
+  </div>
+
+  <div id="loading">场景加载中…</div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* ============================================================
+     * 1. 渲染器
+     * ============================================================ */
+    const app = document.getElementById('app');
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;   // 软阴影
+    renderer.toneMapping = THREE.ACESFilmicToneMapping; // ACES 电影级色调映射
+    renderer.toneMappingExposure = 1.05;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    app.appendChild(renderer.domElement);
+
+    /* ============================================================
+     * 2. 场景 + 雾（增加纵深感）
+     * ============================================================ */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xcfe3f2);
+    scene.fog = new THREE.Fog(0xcfe3f2, 300, 600);
+
+    /* ============================================================
+     * 3. 双相机（正交等距 + 透视 40°）+ OrbitControls，可一键切换
+     * ============================================================ */
+    const viewSize = 150;            // 正交相机视口垂直幅度
+    const aspect = window.innerWidth / window.innerHeight;
+
+    // 正交相机（等距 / 策略游戏视角）
+    const orthoCamera = new THREE.OrthographicCamera(
+      -viewSize * aspect / 2, viewSize * aspect / 2,
+      viewSize / 2, -viewSize / 2,
+      0.1, 2000
+    );
+    // 等距视角：从 (1,1,1) 方向看原点，得到经典等距角度
+    orthoCamera.position.set(150, 150, 150);
+    orthoCamera.lookAt(0, 0, 0);
+
+    // 透视相机（40° FOV）
+    const perspCamera = new THREE.PerspectiveCamera(40, aspect, 0.1, 3000);
+    perspCamera.position.set(150, 150, 150);
+    perspCamera.lookAt(0, 0, 0);
+
+    let activeCamera = orthoCamera;  // 当前生效的相机
+
+    const controls = new OrbitControls(orthoCamera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.target.set(0, 0, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.02; // 不让相机翻到地面以下
+    controls.minPolarAngle = 0.15;
+    controls.minZoom = 0.35;
+    controls.maxZoom = 3.0;
+
+    /* ============================================================
+     * 4. 光照：主光 + 环境光 + 半球光
+     * ============================================================ */
+    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x6b8f5a, 0.95);
+    scene.add(hemi);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xfff3e0, 2.0);
+    sun.position.set(70, 110, 50);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 400;
+    sun.shadow.camera.left = -130;
+    sun.shadow.camera.right = 130;
+    sun.shadow.camera.top = 130;
+    sun.shadow.camera.bottom = -130;
+    sun.shadow.bias = -0.0004;
+    sun.shadow.normalBias = 0.02;
+    scene.add(sun);
+    scene.add(sun.target);
+
+    /* ============================================================
+     * 5. 地面 + 渐变草皮贴片
+     * ============================================================ */
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(600, 600),
+      new THREE.MeshStandardMaterial({ color: 0x7fae5a, roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // 径向渐变草皮贴片（贴在地面增加自然感）
+    function makeGrassPatchTexture() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(128, 128, 10, 128, 128, 128);
+      g.addColorStop(0, 'rgba(150,190,95,0.55)');
+      g.addColorStop(0.6, 'rgba(120,160,80,0.30)');
+      g.addColorStop(1, 'rgba(120,160,80,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 256);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    const grassTex = makeGrassPatchTexture();
+    const grassMat = new THREE.MeshStandardMaterial({
+      map: grassTex, transparent: true, depthWrite: false, roughness: 1
+    });
+    for (let i = 0; i < 26; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 70 + Math.random() * 95;
+      const size = 14 + Math.random() * 22;
+      const patch = new THREE.Mesh(new THREE.PlaneGeometry(size, size), grassMat);
+      patch.rotation.x = -Math.PI / 2;
+      patch.rotation.z = Math.random() * Math.PI;
+      patch.position.set(Math.cos(angle) * radius, 0.02, Math.sin(angle) * radius);
+      scene.add(patch);
+    }
+
+    /* ============================================================
+     * 6. 居中运动场：蓝色圆角跑道 + 绿色足球场（Canvas 白线）
+     * ============================================================ */
+    // 圆角矩形 Shape（带可选内孔 -> 形成跑道环）
+    function roundedRectShape(w, h, r) {
+      const s = new THREE.Shape();
+      const x = -w / 2, y = -h / 2;
+      s.moveTo(x, y + r);
+      s.lineTo(x, y + h - r);
+      s.quadraticCurveTo(x, y + h, x + r, y + h);
+      s.lineTo(x + w - r, y + h);
+      s.quadraticCurveTo(x + w, y + h, x + w, y + h - r);
+      s.lineTo(x + w, y + r);
+      s.quadraticCurveTo(x + w, y, x + w - r, y);
+      s.lineTo(x + r, y);
+      s.quadraticCurveTo(x, y, x, y + r);
+      return s;
+    }
+
+    const TRACK_W = 84, TRACK_H = 54, TRACK_R = 27;       // 跑道外圈
+    const INNER_W = 70, INNER_H = 40, INNER_R = 20;       // 跑道内圈
+    const trackShape = roundedRectShape(TRACK_W, TRACK_H, TRACK_R);
+    trackShape.holes.push(roundedRectShape(INNER_W, INNER_H, INNER_R));
+    const track = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(trackShape, { depth: 0.3, bevelEnabled: false }),
+      new THREE.MeshStandardMaterial({ color: 0x6e8cbe, roughness: 0.75 })
+    );
+    track.rotation.x = -Math.PI / 2;
+    track.position.y = 0.06;
+    track.receiveShadow = true;
+    scene.add(track);
+
+    // 足球场 Canvas 纹理：绿底 + 白线
+    function makeFieldTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1500; c.height = 950;
+      const ctx = c.getContext('2d');
+      const W = c.width, H = c.height, m = 26;          // m = 边线留白
+
+      // 草地底色（加细微条纹模拟修剪痕）
+      ctx.fillStyle = '#4f9a3e';
+      ctx.fillRect(0, 0, W, H);
+      for (let i = 0; i < 10; i++) {
+        ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+        ctx.fillRect((W / 10) * i, 0, W / 10, H);
+      }
+
+      // 白线
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6;
+
+      // 边界
+      ctx.strokeRect(m, m, W - 2 * m, H - 2 * m);
+      // 中线
+      ctx.beginPath(); ctx.moveTo(W / 2, m); ctx.lineTo(W / 2, H - m); ctx.stroke();
+      // 中圈 + 中点
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, H * 0.16, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 7, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+
+      // 大禁区 / 小禁区（左右对称）
+      function penaltyBoxes(side) {
+        const boxW = W * 0.12, boxH = H * 0.52;
+        const gaW = W * 0.05, gaH = H * 0.24;
+        const x = side === 'L' ? m : W - m - boxW;
+        const xg = side === 'L' ? m : W - m - gaW;
+        ctx.strokeRect(x, (H - boxH) / 2, boxW, boxH);
+        ctx.strokeRect(xg, (H - gaH) / 2, gaW, gaH);
+        // 点球点
+        ctx.beginPath();
+        ctx.arc(side === 'L' ? m + boxW * 0.72 : W - m - boxW * 0.72, H / 2, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+      }
+      penaltyBoxes('L'); penaltyBoxes('R');
+
+      // 四角弧
+      const cr = 18;
+      [[m, m, 0], [W - m, m, Math.PI / 2], [W - m, H - m, Math.PI], [m, H - m, -Math.PI / 2]]
+        .forEach(([cx, cy, a]) => {
+          ctx.beginPath(); ctx.arc(cx, cy, cr, a, a + Math.PI / 2); ctx.stroke();
+        });
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 8;
+      return tex;
+    }
+    const field = new THREE.Mesh(
+      new THREE.PlaneGeometry(60, 38),
+      new THREE.MeshStandardMaterial({ map: makeFieldTexture(), roughness: 0.9 })
+    );
+    field.rotation.x = -Math.PI / 2;
+    field.position.y = 0.05;
+    field.receiveShadow = true;
+    scene.add(field);
+
+    /* ============================================================
+     * 7. 现代建筑工厂（主体 + 女儿墙 + 雨棚 + 四面窗户 + 底层装饰带）
+     * ============================================================ */
+    // 共享玻璃窗材质：PBR 物理材质（Standard 的超集），加 clearcoat 让反光更真实
+    const windowMat = new THREE.MeshPhysicalMaterial({
+      color: 0x4ea8de, metalness: 0.4, roughness: 0.12,
+      transparent: true, opacity: 0.85,
+      emissive: 0x123a52, emissiveIntensity: 0.25,
+      clearcoat: 0.4, clearcoatRoughness: 0.1
+    });
+
+    // 在某一面墙上均匀铺一排蓝色玻璃窗（上下各留 10% 边距，窗高动态计算）
+    function buildWindowWall(gridW, wallH, center, rotY) {
+      const winW = 1.3;                 // 窗宽固定
+      const gapX = 0.9, gapY = 0.8;     // 窗户间距
+      const marginY = wallH * 0.10;     // 上下各留 10% 边距，避免贴到屋顶/地面
+      const marginX = 1.0;
+      const usableW = Math.max(winW, gridW - marginX * 2);
+      const usableH = Math.max(2, wallH - marginY * 2);
+
+      // 列数：按宽度与固定窗宽排布
+      const cols = Math.max(1, Math.floor((usableW + gapX) / (winW + gapX)));
+      // 行数：按可用高度决定（目标窗高约 1.8）
+      const rows = Math.max(1, Math.round(usableH / (1.8 + gapY)));
+      // 窗高动态计算：让窗户在可用高度内均匀排满
+      const winH = (usableH - (rows - 1) * gapY) / rows;
+
+      const totalW = cols * winW + (cols - 1) * gapX;
+      const startX = -totalW / 2 + winW / 2;
+      const startY = -usableH / 2 + winH / 2;
+
+      const geo = new THREE.PlaneGeometry(winW, winH);
+      const wall = new THREE.Group();
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const m = new THREE.Mesh(geo, windowMat);
+          m.position.set(startX + c * (winW + gapX), startY + r * (winH + gapY), 0);
+          wall.add(m);
+        }
+      }
+      wall.position.copy(center);
+      wall.rotation.y = rotY;
+      return wall;
+    }
+
+    function makeBuilding(cfg) {
+      const { x, z, w, d, h, bodyColor = 0xf9f9f9, accent = 0x3b5b8a } = cfg;
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+
+      const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.6 });
+      const trimMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.55 });
+
+      // 主体：group 落在地面 y=0，主体内部上移 h/2 使建筑底部贴地
+      const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), bodyMat);
+      body.position.y = h / 2;
+      body.castShadow = true; body.receiveShadow = true;
+      g.add(body);
+
+      // 屋顶女儿墙
+      const parapet = new THREE.Mesh(new THREE.BoxGeometry(w + 0.5, 0.9, d + 0.5), bodyMat);
+      parapet.position.y = h + 0.45;
+      parapet.castShadow = true; parapet.receiveShadow = true;
+      g.add(parapet);
+
+      // 底层装饰带
+      const band = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 1.4, d + 0.2), trimMat);
+      band.position.y = 0.7;
+      band.castShadow = true; band.receiveShadow = true;
+      g.add(band);
+
+      // 入口雨棚（朝向场地中心 +Z 方向）
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.3, 3.2), trimMat);
+      canopy.position.set(0, 3.0, d / 2 + 1.6);
+      canopy.castShadow = true;
+      g.add(canopy);
+      // 雨棚支撑柱
+      const postGeo = new THREE.BoxGeometry(0.25, 3, 0.25);
+      for (const px of [-w * 0.22, w * 0.22]) {
+        const post = new THREE.Mesh(postGeo, bodyMat);
+        post.position.set(px, 1.5, d / 2 + 3.0);
+        post.castShadow = true;
+        g.add(post);
+      }
+
+      // 四面玻璃窗户
+      g.add(buildWindowWall(w, h, new THREE.Vector3(0, h / 2, d / 2 + 0.02), 0));          // 前
+      g.add(buildWindowWall(w, h, new THREE.Vector3(0, h / 2, -d / 2 - 0.02), Math.PI));   // 后
+      g.add(buildWindowWall(d, h, new THREE.Vector3(w / 2 + 0.02, h / 2, 0), Math.PI / 2));// 右
+      g.add(buildWindowWall(d, h, new THREE.Vector3(-w / 2 - 0.02, h / 2, 0), -Math.PI / 2));// 左
+
+      return g;
+    }
+
+    // 8 栋不同尺寸的现代建筑，环绕运动场分布
+    const buildings = [
+      { x: -58, z: -42, w: 14, d: 12, h: 16, accent: 0x3b5b8a },
+      { x:   0, z: -56, w: 24, d: 12, h: 11, accent: 0x2f7d6b },
+      { x:  58, z: -42, w: 14, d: 14, h: 21, accent: 0x8a5a2f },
+      { x:  78, z:   0, w: 12, d: 16, h: 14, accent: 0x6a3b8a },
+      { x:  58, z:  42, w: 16, d: 12, h: 18, accent: 0x8a3b5b },
+      { x:   0, z:  56, w: 26, d: 12, h: 10, accent: 0x2f6b8a },
+      { x: -58, z:  42, w: 14, d: 14, h: 23, accent: 0x5b8a3b },
+      { x: -78, z:   0, w: 12, d: 12, h: 15, accent: 0x8a6a3b },
+    ].map(makeBuilding);
+    buildings.forEach(b => scene.add(b));
+
+    /* ============================================================
+     * 8. 树木（分层锥体树冠 + 圆柱树干），随机散布
+     * ============================================================ */
+    const trunkGeo = new THREE.CylinderGeometry(0.28, 0.4, 1, 8);
+    const coneGeo = new THREE.ConeGeometry(1, 1, 9);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.9 });
+    const leafMats = [
+      new THREE.MeshStandardMaterial({ color: 0x3f7d3a, roughness: 0.85 }),
+      new THREE.MeshStandardMaterial({ color: 0x4f9145, roughness: 0.85 }),
+      new THREE.MeshStandardMaterial({ color: 0x356b32, roughness: 0.85 }),
+    ];
+
+    function makeTree(x, z, scale) {
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      const mat = leafMats[Math.floor(Math.random() * leafMats.length)];
+
+      // 树干
+      const trunkH = 2.2 * scale;
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.scale.set(scale, trunkH, scale);
+      trunk.position.y = trunkH / 2;
+      trunk.castShadow = true;
+      g.add(trunk);
+
+      // 三层锥体树冠
+      const layers = [
+        { r: 2.4 * scale, h: 3.0 * scale, y: trunkH + 1.0 * scale },
+        { r: 1.9 * scale, h: 2.6 * scale, y: trunkH + 2.8 * scale },
+        { r: 1.3 * scale, h: 2.2 * scale, y: trunkH + 4.4 * scale },
+      ];
+      for (const L of layers) {
+        const cone = new THREE.Mesh(coneGeo, mat);
+        cone.scale.set(L.r, L.h, L.r);
+        cone.position.y = L.y;
+        cone.castShadow = true;
+        g.add(cone);
+      }
+      return g;
+    }
+
+    // 在建筑外围随机种树（避开跑道和建筑）
+    let placed = 0, attempts = 0;
+    while (placed < 36 && attempts < 600) {
+      attempts++;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 48 + Math.random() * 95;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      // 避开建筑（与任一建筑中心距离过近则跳过）
+      let tooClose = false;
+      for (const b of buildings) {
+        const dx = x - b.position.x, dz = z - b.position.z;
+        if (Math.hypot(dx, dz) < 14) { tooClose = true; break; }
+      }
+      if (tooClose) continue;
+      scene.add(makeTree(x, z, 0.7 + Math.random() * 0.9));
+      placed++;
+    }
+
+    /* ============================================================
+     * 8.5 路灯（圆柱灯杆 + 发光灯泡），夜景时灯泡自发光增强
+     * ============================================================ */
+    const lampPoleMat = new THREE.MeshStandardMaterial({ color: 0x2a2f36, roughness: 0.5, metalness: 0.6 });
+    const lampBulbMat = new THREE.MeshStandardMaterial({
+      color: 0xfff2cc, emissive: 0xffcf7a, emissiveIntensity: 0.15, roughness: 0.3
+    });
+    const lampPoleGeo = new THREE.CylinderGeometry(0.12, 0.16, 6, 8);
+    const lampBulbGeo = new THREE.SphereGeometry(0.4, 14, 14);
+    const LAMP_COUNT = 12;
+    for (let i = 0; i < LAMP_COUNT; i++) {
+      const a = (i / LAMP_COUNT) * Math.PI * 2;
+      const lamp = new THREE.Group();
+      lamp.position.set(Math.cos(a) * 50, 0, Math.sin(a) * 50); // 沿跑道外圈布置
+      const pole = new THREE.Mesh(lampPoleGeo, lampPoleMat);
+      pole.position.y = 3; pole.castShadow = true;
+      lamp.add(pole);
+      const bulb = new THREE.Mesh(lampBulbGeo, lampBulbMat);
+      bulb.position.y = 6.1;
+      lamp.add(bulb);
+      scene.add(lamp);
+    }
+
+    /* ============================================================
+     * 9. 浅色路径：环绕各建筑 + 连接相邻建筑
+     * ============================================================ */
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0xd7cdb8, roughness: 0.95 });
+
+    // 任意两点之间铺一条扁平路径
+    function makePath(x1, z1, x2, z2, width = 3.2) {
+      const dx = x2 - x1, dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, 0.12, width), pathMat);
+      mesh.position.set((x1 + x2) / 2, 0.06, (z1 + z2) / 2);
+      mesh.rotation.y = -Math.atan2(dz, dx);
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+
+    // 跑道外圈一圈环道
+    const ringR = 47, segs = 48;
+    for (let i = 0; i < segs; i++) {
+      const a1 = (i / segs) * Math.PI * 2;
+      const a2 = ((i + 1) / segs) * Math.PI * 2;
+      makePath(Math.cos(a1) * ringR, Math.sin(a1) * ringR,
+               Math.cos(a2) * ringR, Math.sin(a2) * ringR, 4);
+    }
+    // 相邻建筑之间的连接路径（建筑朝向场地中心的入口附近）
+    for (let i = 0; i < buildings.length; i++) {
+      const a = buildings[i].position;
+      const b = buildings[(i + 1) % buildings.length].position;
+      makePath(a.x, a.z, b.x, b.z, 4.5);
+    }
+
+    /* ============================================================
+     * 10. 窗口缩放（双相机都要更新）
+     * ============================================================ */
+    function onResize() {
+      const w = window.innerWidth, h = window.innerHeight;
+      const a = w / h;
+      orthoCamera.left = -viewSize * a / 2;
+      orthoCamera.right = viewSize * a / 2;
+      orthoCamera.top = viewSize / 2;
+      orthoCamera.bottom = -viewSize / 2;
+      orthoCamera.updateProjectionMatrix();
+      perspCamera.aspect = a;
+      perspCamera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+
+    /* ============================================================
+     * 11. 渲染循环（始终渲染当前生效的相机）
+     * ============================================================ */
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, activeCamera);
+    }
+
+    /* ============================================================
+     * 12. 昼夜预设 + 顶部按钮交互
+     * ============================================================ */
+    const dayPreset = {
+      bg: 0xcfe3f2, fog: 0xcfe3f2, fogNear: 300, fogFar: 600,
+      hemiSky: 0xbfe3ff, hemiGround: 0x6b8f5a, hemiIntensity: 0.95,
+      ambientColor: 0xffffff, ambientIntensity: 0.25,
+      sunColor: 0xfff3e0, sunIntensity: 2.0,
+      exposure: 1.05,
+      windowEmissive: 0x123a52, windowEmissiveIntensity: 0.25,
+      lampEmissiveIntensity: 0.15,
+    };
+    const nightPreset = {
+      bg: 0x162030, fog: 0x162030, fogNear: 220, fogFar: 540,
+      hemiSky: 0x243a5e, hemiGround: 0x0e1620, hemiIntensity: 0.30,
+      ambientColor: 0x3a4a66, ambientIntensity: 0.18,
+      sunColor: 0xaec6ee, sunIntensity: 0.35,         // 暗淡月光，强度大幅降低
+      exposure: 0.7,
+      windowEmissive: 0xffcf7a, windowEmissiveIntensity: 1.4, // 室内暖黄灯光透出
+      lampEmissiveIntensity: 2.6,                     // 路灯灯泡自发光增强
+    };
+
+    function applyPreset(p) {
+      scene.background = new THREE.Color(p.bg);
+      scene.fog.color.set(p.fog);
+      scene.fog.near = p.fogNear;
+      scene.fog.far = p.fogFar;
+      hemi.color.set(p.hemiSky);
+      hemi.groundColor.set(p.hemiGround);
+      hemi.intensity = p.hemiIntensity;
+      ambient.color.set(p.ambientColor);
+      ambient.intensity = p.ambientIntensity;
+      sun.color.set(p.sunColor);
+      sun.intensity = p.sunIntensity;
+      renderer.toneMappingExposure = p.exposure;
+      windowMat.emissive.set(p.windowEmissive);
+      windowMat.emissiveIntensity = p.windowEmissiveIntensity;
+      lampBulbMat.emissiveIntensity = p.lampEmissiveIntensity;
+    }
+
+    // 按钮：切换正交 / 透视
+    // 关键点：全程复用同一个 controls.target，绝不修改它；并通过「按 FOV/zoom 匹配画面尺度」
+    // 让正交与透视在切换瞬间呈现一致大小，从而消除画面跳变。
+    const btnCam = document.getElementById('btn-camera');
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(40) / 2); // 透视相机 40° FOV 的一半
+    btnCam.addEventListener('click', () => {
+      const target = controls.target; // 单一真相源，切换前后保持不变
+      if (activeCamera === orthoCamera) {
+        // 正交 -> 透视：沿当前视角方向，放到与正交画面尺度一致的距离
+        const dir = new THREE.Vector3().subVectors(orthoCamera.position, target).normalize();
+        const D = (viewSize / 2) / (orthoCamera.zoom * tanHalfFov);
+        perspCamera.position.copy(target).addScaledVector(dir, D);
+        activeCamera = perspCamera;
+        btnCam.textContent = '透视视角 · 点击切换';
+      } else {
+        // 透视 -> 正交：按当前距离反算 zoom，保持画面尺度一致
+        const offset = new THREE.Vector3().subVectors(perspCamera.position, target);
+        const D = offset.length();
+        const zoom = THREE.MathUtils.clamp((viewSize / 2) / (D * tanHalfFov), controls.minZoom, controls.maxZoom);
+        orthoCamera.zoom = zoom;
+        orthoCamera.position.copy(target).addScaledVector(offset.normalize(), D);
+        activeCamera = orthoCamera;
+        btnCam.textContent = '正交视角 · 点击切换';
+      }
+      controls.object = activeCamera; // OrbitControls 接管新相机，target 保持不变
+      controls.update();
+    });
+
+    // 按钮：切换白天 / 夜景
+    let isNight = false;
+    const btnDay = document.getElementById('btn-daynight');
+    btnDay.addEventListener('click', () => {
+      isNight = !isNight;
+      applyPreset(isNight ? nightPreset : dayPreset);
+      btnDay.textContent = isNight ? '夜景模式 · 点击切换' : '白天模式 · 点击切换';
+    });
+
+    // 隐藏 loading
+    const loading = document.getElementById('loading');
+    loading.style.opacity = '0';
+    setTimeout(() => loading.remove(), 600);
+
+    animate();
+  </script>
+</body>
+</html>

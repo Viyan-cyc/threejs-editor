@@ -1,4 +1,4 @@
-import type { DomainKind, SceneDSL } from '../../core/dsl/types';
+import type { DomainKind, SceneDSL, SceneEditDSL } from '../../core/dsl/types';
 import { SCENE_DSL_VERSION } from '../../core/dsl/types';
 
 /**
@@ -99,4 +99,29 @@ export function mockSceneFor(domain: DomainKind): SceneDSL {
         objects: [],
       };
   }
+}
+
+/**
+ * 编辑模式示例 SceneEditDSL（Mock 用）：返回一个「新增蓝色集装箱」op。
+ * index 用于错开重复新增的位置，避免完全重叠。
+ */
+export function mockEditFor(domain: DomainKind, index = 0): SceneEditDSL {
+  const x = -16 + (index % 4) * 4;
+  const z = 8 + Math.floor(index / 4) * 4;
+  return {
+    mode: 'edit',
+    domain,
+    ops: [
+      {
+        op: 'add',
+        object: {
+          type: 'container',
+          name: `新增集装箱 #${index + 1}（Mock）`,
+          transform: { position: [x, 1.25, z] },
+          params: { shape: 'box', size: [6, 2.5, 2.5], color: '#3b7dd2' },
+        },
+      },
+    ],
+    notes: ['（Mock 适配器）演示「增量新增」：追加一个蓝色集装箱。接入真实 LLM 后将按指令真正增删改。'],
+  };
 }

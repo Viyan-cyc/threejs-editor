@@ -13,4 +13,6 @@ export interface GenerateOptions {
   model?: string;
   /** 中止信号 */
   signal?: AbortSignal;
+  /** 当前场景；非空表示进入「编辑现有场景」模式（Mock 等适配器据此分流 create/edit） */
+  currentScene?: SceneDSL | null;
 }

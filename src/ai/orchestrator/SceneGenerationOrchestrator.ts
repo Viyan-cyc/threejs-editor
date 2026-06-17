@@ -1,17 +1,19 @@
-import type { DomainKind, SceneDSL } from '../../core/dsl/types';
+import type { DomainKind, SceneDSL, SceneGenerationResult } from '../../core/dsl/types';
 import type { LLMAdapter } from '../adapter/LLMAdapter';
 import type { PromptBuilder } from '../prompt/PromptBuilder';
 import type { GenerateOptions } from '../types';
-import { normalizeSceneDSL } from './normalizeDSL';
+import { assignIds, isSceneEditDSL, normalizeEditDSL, normalizeSceneDSL } from './normalizeDSL';
 
 /**
- * SceneGenerationOrchestrator —— 编排「自然语言 → SceneDSL」。
+ * SceneGenerationOrchestrator —— 编排「自然语言 → 场景产物」。
  *
- * 1. 用 PromptBuilder 组装提示词（注入领域知识）；
- * 2. 调 LLMAdapter 产出 SceneDSL；
- * 3. （TODO）对 DSL 做 schema 校验 / 修复，再返回。
+ * 1. 用 PromptBuilder 组装提示词（无 currentScene → create；有 → edit，注入当前对象清单）；
+ * 2. 调 LLMAdapter 产出 SceneDSL（create/重建）或 SceneEditDSL（edit）；
+ * 3. 按 mode 判别并规范化：
+ *    - edit（且本次确为编辑请求）→ normalizeEditDSL；
+ *    - 其余 → normalizeSceneDSL + assignIds（完整场景，所有对象带稳定 id）。
  *
- * 引擎层（EditorEngine）拿到 DSL 后再交给 SceneBuilder 解释为 Three.js。
+ * 引擎层（EditorEngine）拿到结果后：edit 合并到上一份 DSL，create 直接全量重建。
  */
 export class SceneGenerationOrchestrator {
   constructor(
@@ -19,10 +21,20 @@ export class SceneGenerationOrchestrator {
     private readonly promptBuilder: PromptBuilder,
   ) {}
 
-  async generate(naturalLanguage: string, domain: DomainKind, opts?: GenerateOptions): Promise<SceneDSL> {
-    const prompt = this.promptBuilder.build(domain, naturalLanguage);
+  async generate(
+    naturalLanguage: string,
+    domain: DomainKind,
+    opts?: GenerateOptions,
+  ): Promise<SceneGenerationResult> {
+    const currentScene = opts?.currentScene ?? null;
+    const prompt = this.promptBuilder.build(domain, naturalLanguage, { currentScene });
     const raw = await this.adapter.generateScene(prompt, opts);
-    // 规范化字段（version/domain 兜底、notes→string[]、数组兜底）。更严格的 schema 校验为后续 TODO。
-    return normalizeSceneDSL(raw, domain);
+
+    // 仅当本次是「编辑请求」（已有 currentScene）且模型确实输出 edit 时，才走 edit 分支；
+    // 否则一律按完整场景处理（含「重新生成」时模型返回完整 DSL 的兜底）。
+    if (currentScene && isSceneEditDSL(raw)) {
+      return normalizeEditDSL(raw as unknown as Parameters<typeof normalizeEditDSL>[0], domain);
+    }
+    return assignIds(normalizeSceneDSL(raw as Partial<SceneDSL>, domain));
   }
 }

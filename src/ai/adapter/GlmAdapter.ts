@@ -1,7 +1,7 @@
-import type { SceneDSL } from '../../core/dsl/types';
+import type { SceneDSL, SceneEditDSL } from '../../core/dsl/types';
 import type { GenerateOptions, GenerationPrompt } from '../types';
 import type { LLMAdapter } from './LLMAdapter';
-import { parseSceneDSL } from './extractJson';
+import { parseJSONObject } from './extractJson';
 
 /** 智谱 GLM 适配器配置。endpoint 应指向 vite proxy 同源路径以绕过 CORS。 */
 export interface GlmConfig {
@@ -40,7 +40,7 @@ export class GlmAdapter implements LLMAdapter {
     }
   }
 
-  async generateScene(prompt: GenerationPrompt, opts?: GenerateOptions): Promise<SceneDSL> {
+  async generateScene(prompt: GenerationPrompt, opts?: GenerateOptions): Promise<SceneDSL | SceneEditDSL> {
     const res = await fetch(this.cfg.endpoint, {
       method: 'POST',
       headers: {
@@ -69,6 +69,8 @@ export class GlmAdapter implements LLMAdapter {
     if (!content) {
       throw new Error('GLM 返回为空（无 choices[0].message.content）。');
     }
-    return parseSceneDSL(content);
+    // create 模式返回完整 SceneDSL；edit 模式可能返回 SceneEditDSL（mode:"edit"）或完整 SceneDSL（重新生成）。
+    // 统一用 parseJSONObject 容错解析，由 orchestrator 按 mode 判别。
+    return parseJSONObject<SceneDSL | SceneEditDSL>(content);
   }
 }

@@ -80,6 +80,8 @@ export interface CameraAnimationDSL {
 
 /** 单个场景对象 → 对应领域的 ObjectBuilder。 */
 export interface SceneObjectDSL {
+  /** 稳定唯一标识，用于跨轮增删改匹配。缺省由 normalize 层补全 */
+  id?: string;
   /** 对象类型，对应领域内 ObjectBuilder.type，如 'solar-panel-array' */
   type: string;
   /** 所属领域；缺省取 SceneDSL.domain。用于跨领域混排 */
@@ -104,6 +106,34 @@ export interface SceneDSL {
   /** AI 给用户的说明，展示在聊天区 */
   notes?: string[];
 }
+
+/**
+ * 增量编辑操作 —— AI 在「编辑现有场景」模式下产出的 ops。
+ * op 只描述「改了什么」，由 applyEditOps 合并到上一份完整 SceneDSL，
+ * 引擎再按 id diff，不直接消费 op。
+ */
+export type SceneEditOp =
+  | { op: 'add'; parentId?: string; object: SceneObjectDSL } // 缺 parentId → 加到根
+  | { op: 'update'; id: string; changes: Partial<SceneObjectDSL> } // 按 id 局部修改
+  | { op: 'remove'; id: string }; // 按 id 删除
+
+/**
+ * 编辑模式产物。与完整 SceneDSL 二选一，由顶层 `mode` 判别。
+ * environment/lights/camera/cameraAnimation「出现才覆盖上一份对应字段」，缺省 = 不变。
+ */
+export interface SceneEditDSL {
+  mode: 'edit';
+  domain: DomainKind;
+  ops: SceneEditOp[];
+  environment?: EnvironmentDSL;
+  lights?: LightDSL[];
+  camera?: CameraDSL;
+  cameraAnimation?: CameraAnimationDSL;
+  notes?: string[];
+}
+
+/** AI 一次产出的可能结果：完整场景（create/重建）或增量编辑（edit）。 */
+export type SceneGenerationResult = SceneDSL | SceneEditDSL;
 
 /** 通用几何基本形状（清单外对象的兜底渲染用）。 */
 export type ShapeKind = 'box' | 'cylinder' | 'sphere' | 'cone';
