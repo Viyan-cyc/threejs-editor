@@ -15,4 +15,6 @@ export interface GenerateOptions {
   signal?: AbortSignal;
   /** 当前场景；非空表示进入「编辑现有场景」模式（Mock 等适配器据此分流 create/edit） */
   currentScene?: SceneDSL | null;
+  /** 模型思考过程（reasoning）增量回调：流式时每个 token 片段触发一次，供 UI 实时显示「思考过程」。 */
+  onReasoning?: (delta: string) => void;
 }

@@ -19,6 +19,7 @@ import { appConfig } from '../../config/app.config';
 import { PromptBuilder } from '../../ai/prompt/PromptBuilder';
 import { SceneGenerationOrchestrator } from '../../ai/orchestrator/SceneGenerationOrchestrator';
 import { applyEditOps, isSceneEditDSL } from '../../ai/orchestrator/normalizeDSL';
+import type { GenerateOptions } from '../../ai/types';
 import { DOMAINS } from '../../config/domains.config';
 import type { DomainKind, SceneDSL, SceneEditDSL, SceneObjectDSL } from '../dsl/types';
 import { SCENE_DSL_VERSION } from '../dsl/types';
@@ -96,6 +97,7 @@ export class EditorEngine {
       environment: this.environment,
       camera: this.cameraAnimator,
       onProgress: undefined,
+      onWarning: undefined,
     };
 
     this.sceneBuilder = new SceneBuilder(this.domains, this.ctx);
@@ -133,9 +135,14 @@ export class EditorEngine {
    * - 首次 / 重新生成：orchestrator 返回完整 SceneDSL → 全量重建。
    * - 编辑：orchestrator 返回 SceneEditDSL → 合并到 currentScene → 按 id diff。
    */
-  async generate(naturalLanguage: string, domain: DomainKind): Promise<SceneDSL> {
+  async generate(
+    naturalLanguage: string,
+    domain: DomainKind,
+    opts?: GenerateOptions,
+  ): Promise<SceneDSL> {
     const result = await this.orchestrator.generate(naturalLanguage, domain, {
       currentScene: this.currentScene,
+      ...opts, // 透传 onReasoning / signal / model
     });
 
     let nextScene: SceneDSL;
@@ -170,6 +177,11 @@ export class EditorEngine {
   /** 注入进度回调：SceneBuilder 生成对象（混元等耗时步骤）时回传文案，由 UI 层接线显示。 */
   setProgressHandler(fn: (text: string) => void): void {
     this.ctx.onProgress = fn;
+  }
+
+  /** 注入警告回调：对象级非致命失败（如混元生成失败被跳过）时回传文案，由 UI 层接线为对话框系统消息。 */
+  setWarningHandler(fn: (text: string) => void): void {
+    this.ctx.onWarning = fn;
   }
 
 

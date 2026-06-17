@@ -55,12 +55,16 @@ export class HunyuanModelGenerator {
       headers: { 'Content-Type': 'application/json' },
       body: key,
     });
-    if (!res.ok) {
-      throw new Error(`混元生成请求失败 ${res.status}`);
+    // 先解析 body：middleware 失败时（502）会把人话 message 放在 body 里，
+    // 不能因 !res.ok 就直接抛 status 码——那样会丢掉 message，让上层无从总结原因。
+    let data: { url?: string; error?: string; message?: string } | null = null;
+    try {
+      data = (await res.json()) as { url?: string; error?: string; message?: string };
+    } catch {
+      /* body 非 JSON（如网络中断），保留 null 走兜底文案 */
     }
-    const data = (await res.json()) as { url?: string; error?: string };
-    if (data.error || !data.url) {
-      throw new Error(data.error ?? '混元未返回模型 URL');
+    if (!res.ok || data?.error || !data?.url) {
+      throw new Error(data?.message ?? data?.error ?? `混元生成请求失败 ${res.status}`);
     }
 
     const wrapper = await this.loadAndNormalize(data.url, node.type);

@@ -26,4 +26,6 @@ export interface EditorContext {
   camera: CameraAnimator;
   /** 进度回调：SceneBuilder 生成对象（尤其耗时的混元生成）时调用，UI 层接线显示文案 */
   onProgress?: (text: string) => void;
+  /** 警告回调：对象级非致命失败（如混元生成失败被跳过）时调用，UI 层接线为对话框系统消息 */
+  onWarning?: (text: string) => void;
 }

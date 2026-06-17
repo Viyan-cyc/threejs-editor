@@ -4,6 +4,7 @@ import type { DomainRegistry } from '../registry/DomainRegistry';
 import type { EditorContext } from '../registry/EditorContext';
 import { applyTransform } from '../../three/utils/transform';
 import { GenericShapeBuilder } from './GenericShapeBuilder';
+import { summarizeHunyuanError } from '../capabilities/hunyuan/summarizeError';
 
 /**
  * SceneBuilder —— 把 SceneDSL 解释成 THREE.Object3D 树。
@@ -70,16 +71,23 @@ export class SceneBuilder {
     return obj;
   }
 
-  /** 清单外对象：有 generate.prompt 走混元高精度生成；无 prompt 或生成失败则走通用几何 lowPoly 兜底。 */
+  /**
+   * 清单外对象构建：
+   *  - 有 generate.prompt：走混元高精度生成；失败则推 onWarning 警告 + 返回空 Group（跳过、不显示）。
+   *  - 无 generate.prompt：走通用几何 lowPoly 兜底（LLM 给了未登记类型但未要求生成）。
+   *
+   * 注意：混元失败不再降级 lowPoly（按产品决定，失败即不显示该对象）。返回空 Group 而非抛错，
+   * 是为保留 dslId/transform 索引——后续编辑若修复混元，diff 能正常重建该对象。
+   */
   private async buildGeneric(node: SceneObjectDSL): Promise<THREE.Object3D> {
     if (node.generate?.prompt) {
       try {
-        const obj = await this.ctx.hunyuan.generate(node.generate, node, this.ctx.onProgress);
-        void fetch('/hunyuan3d/diag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ where: 'buildGeneric-ok', type: node.type }) }).catch(() => {});
-        return obj;
+        return await this.ctx.hunyuan.generate(node.generate, node, this.ctx.onProgress);
       } catch (err) {
-        void fetch('/hunyuan3d/diag', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ where: 'buildGeneric-fail', type: node.type, error: (err as Error).message, stack: (err as Error).stack }) }).catch(() => {});
-        console.warn(`[SceneBuilder] 混元生成 "${node.type}" 失败，降级 lowPoly：`, err);
+        const label = node.name ?? node.type;
+        this.ctx.onWarning?.(summarizeHunyuanError(label, err));
+        console.warn(`[SceneBuilder] 混元生成 "${label}" 失败，跳过该对象：`, err);
+        return new THREE.Group();
       }
     }
     console.warn(`[SceneBuilder] 未注册对象类型 "${node.type}"，使用通用几何兜底（简化模型）。`);

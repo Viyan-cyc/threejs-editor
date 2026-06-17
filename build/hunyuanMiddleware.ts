@@ -156,19 +156,6 @@ function send(res: Connect.ServerResponse, status: number, body: GenerateRespons
 export function installHunyuanMiddleware(server: ViteDevServer, opts: HunyuanMiddlewareOptions): void {
   const generatedDir = join(opts.publicDir, 'assets', 'generated');
 
-  // 诊断端点（调试用）：前端把加载结果 POST 过来打印到日志。TODO 验证后删
-  server.middlewares.use('/hunyuan3d/diag', async (req: Connect.IncomingMessage, res: Connect.ServerResponse) => {
-    if (req.method === 'POST') {
-      try {
-        console.log('[hunyuan-diag]', await readBody(req));
-      } catch {
-        /* ignore */
-      }
-    }
-    res.setHeader('Content-Type', 'text/plain');
-    res.end('ok');
-  });
-
   server.middlewares.use(ENDPOINT, async (req: Connect.IncomingMessage, res: Connect.ServerResponse) => {
     if (req.method !== 'POST') {
       send(res, 405, { error: 'METHOD_NOT_ALLOWED', message: '仅支持 POST' });
