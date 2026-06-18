@@ -18,6 +18,14 @@ export const energyPrompt: DomainPrompt = {
       description: '升压站 / 汇流站设施',
       params: { capacity: '装机容量描述，如 "100MW"' },
     },
+    {
+      type: 'energy-reservoir',
+      description: '储能箱 / 储能柜，电池储能单元',
+      params: {
+        color: '柜体颜色（hex 或颜色名，默认深灰）',
+        capacity: '容量描述，如 "200kWh"（仅展示，不影响模型）',
+      },
+    },
   ],
   rules: [
     '光伏阵列应朝向阳光充足的一侧（北半球朝南）。',

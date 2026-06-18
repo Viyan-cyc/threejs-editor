@@ -186,6 +186,11 @@ export class EditorEngine {
     this.ctx.onWarning = fn;
   }
 
+  /** 按 dslId 查已构建的 Object3D（供 GUI 等外部按 id 访问实例做调试）。 */
+  getObject3D(id: string): THREE.Object3D | undefined {
+    return this.instanceById.get(id);
+  }
+
 
   /**
    * 用 DSL 应用场景。

@@ -63,6 +63,11 @@ export class LightingManager {
     return light;
   }
 
+  /** 返回本管理器当前创建的灯光（供 GUI 等外部按需调试）。 */
+  getLights(): THREE.Light[] {
+    return this.created;
+  }
+
   /** 移除并释放本管理器创建的所有灯光。 */
   clear(): void {
     for (const light of this.created) {

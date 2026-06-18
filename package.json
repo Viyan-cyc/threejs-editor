@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "lil-gui": "^0.21.0",
     "pinia": "^2.2.6",
     "three": "^0.169.0",
     "vue": "^3.5.13"
