@@ -73,21 +73,25 @@ export class SceneBuilder {
 
   /**
    * 清单外对象构建：
-   *  - 有 generate.prompt：走混元高精度生成；失败则推 onWarning 警告 + 返回空 Group（跳过、不显示）。
-   *  - 无 generate.prompt：走通用几何 lowPoly 兜底（LLM 给了未登记类型但未要求生成）。
-   *
-   * 注意：混元失败不再降级 lowPoly（按产品决定，失败即不显示该对象）。返回空 Group 而非抛错，
-   * 是为保留 dslId/transform 索引——后续编辑若修复混元，diff 能正常重建该对象。
+   *  - 有 generate.prompt：走混元高精度生成；失败则推 onWarning 警告，并降级通用几何 lowPoly（保证对象仍可见）。
+   *  - 无 generate.prompt：直接走通用几何 lowPoly 兜底（LLM 给了未登记类型但未要求生成）。
    */
   private async buildGeneric(node: SceneObjectDSL): Promise<THREE.Object3D> {
     if (node.generate?.prompt) {
       try {
-        return await this.ctx.hunyuan.generate(node.generate, node, this.ctx.onProgress);
+        const result = await this.ctx.hunyuan.generate(node.generate, node, this.ctx.onProgress);
+        // 回写混元生成结果到 DSL 节点，供 Inspector 查看（model 标记 + 模型下载路径）。
+        // node 是 currentScene.objects 的引用，回写后 Inspector 的 JSON 序列化即包含。
+        node.model = true;
+        node.url = result.url;
+        return result.object;
       } catch (err) {
         const label = node.name ?? node.type;
         this.ctx.onWarning?.(summarizeHunyuanError(label, err));
-        console.warn(`[SceneBuilder] 混元生成 "${label}" 失败，跳过该对象：`, err);
-        return new THREE.Group();
+        console.warn(`[SceneBuilder] 混元生成 "${label}" 失败，降级 lowPoly：`, err);
+        // 失败也回写：model=true 标记此对象走混元路径，url 留空表示未拿到模型（已降级 lowPoly）
+        node.model = true;
+        node.url = '';
       }
     }
     console.warn(`[SceneBuilder] 未注册对象类型 "${node.type}"，使用通用几何兜底（简化模型）。`);

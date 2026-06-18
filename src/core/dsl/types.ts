@@ -95,6 +95,10 @@ export interface SceneObjectDSL {
    * 仅当 type 不在任何领域的 builder 清单里时生效。
    */
   generate?: GenerateDSL;
+  /** 引擎回写：true 表示此对象已由混元3D 生成高精度模型（运行时填，AI 不产出）。 */
+  model?: boolean;
+  /** 引擎回写：混元生成模型的下载路径（model=true 时填，如 /assets/generated/<hash>.glb）。 */
+  url?: string;
   children?: SceneObjectDSL[];
 }
 

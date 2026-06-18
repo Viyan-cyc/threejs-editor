@@ -20,10 +20,20 @@ import type { GenerateDSL, SceneObjectDSL } from '../../dsl/types';
  *
  * 复用 ModelFactory 的 loader + Map cache + clone(true) 范式。
  */
+/** 混元3D 生成结果：标记此对象来自混元 + 模型下载路径 + 归一化后的 3D 对象。 */
+export interface HunyuanGenerationResult {
+  /** 标识：此对象来自混元3D 生成（区别于清单内资产 / 通用几何兜底） */
+  model: true;
+  /** 生成模型的下载路径（本地落盘 URL，如 /assets/generated/<hash>.glb） */
+  url: string;
+  /** 归一化后的 3D 对象（已 clone，可直接挂载） */
+  object: THREE.Object3D;
+}
+
 export class HunyuanModelGenerator {
   private readonly loader: GLTFLoader;
-  /** key = JSON.stringify(params) → 已归一化的模板（wrapper group，克隆用） */
-  private readonly cache = new Map<string, THREE.Object3D>();
+  /** key = JSON.stringify(params) → { url, 已归一化模板 }，二次命中走 clone。 */
+  private readonly cache = new Map<string, { url: string; template: THREE.Object3D }>();
 
   constructor() {
     this.loader = new GLTFLoader();
@@ -39,14 +49,14 @@ export class HunyuanModelGenerator {
     params: GenerateDSL,
     node: SceneObjectDSL,
     onProgress?: (text: string) => void,
-  ): Promise<THREE.Object3D> {
+  ): Promise<HunyuanGenerationResult> {
     const key = JSON.stringify(params);
     const label = node.name ?? node.type;
 
     const cached = this.cache.get(key);
     if (cached) {
       onProgress?.(`加载已缓存：${label}…`);
-      return cached.clone(true);
+      return { model: true, url: cached.url, object: cached.template.clone(true) };
     }
 
     onProgress?.(`正在生成：${label}…`);
@@ -68,8 +78,8 @@ export class HunyuanModelGenerator {
     }
 
     const wrapper = await this.loadAndNormalize(data.url, node.type);
-    this.cache.set(key, wrapper);
-    return wrapper.clone(true);
+    this.cache.set(key, { url: data.url, template: wrapper });
+    return { model: true, url: data.url, object: wrapper.clone(true) };
   }
 
   /** 加载 GLB 并归一化到单位包围盒（wrapper 包裹、开阴影），返回模板。 */

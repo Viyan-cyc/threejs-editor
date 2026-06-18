@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import Toolbar from './Toolbar.vue';
-import SceneTreePanel from '../scene-tree/SceneTreePanel.vue';
 import ViewportPanel from '../viewport/ViewportPanel.vue';
 import ChatPanel from '../chat/ChatPanel.vue';
 import InspectorPanel from '../inspector/InspectorPanel.vue';
@@ -22,7 +21,6 @@ const SIDE_W = 320;
     <ChatPanel v-show="!chatCollapsed" class="layout__chat" />
     <div class="layout__center">
       <ViewportPanel class="layout__viewport" />
-      <SceneTreePanel class="layout__tree" />
     </div>
     <InspectorPanel v-show="!inspectorCollapsed" class="layout__inspector" />
 
@@ -67,17 +65,12 @@ const SIDE_W = 320;
 .layout__center {
   grid-area: center;
   display: grid;
-  grid-template-rows: 1fr 240px;
+  grid-template-rows: 1fr;
   min-width: 0;
   min-height: 0;
 }
 .layout__viewport {
   min-height: 0;
-}
-.layout__tree {
-  border-top: 1px solid #e5e7eb;
-  min-height: 0;
-  overflow: hidden;
 }
 .layout__inspector {
   grid-area: inspector;

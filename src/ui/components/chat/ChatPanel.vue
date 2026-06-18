@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useChatStore } from '../../stores/chatStore';
 import { useEditorStore } from '../../stores/editorStore';
 import type { DomainKind } from '../../../core/dsl/types';
@@ -13,8 +14,52 @@ const domains: Array<{ id: DomainKind; label: string }> = [
   { id: 'smart-home', label: '智能家居' },
 ];
 
+/** 输入历史 recall 游标：-1 = 当前编辑（非 recall 状态）；>=0 = 正在显示 history[idx]。 */
+const histIdx = ref(-1);
+
+/** 切换到更早一条历史输入。 */
+function recallPrev(): void {
+  const h = chat.history;
+  if (!h.length) return;
+  histIdx.value = histIdx.value < 0 ? h.length - 1 : Math.min(histIdx.value + 1, h.length - 1);
+  chat.input = h[histIdx.value];
+}
+/** 切换到更新一条，到底则清空回到当前编辑。 */
+function recallNext(): void {
+  if (histIdx.value < 0) return;
+  histIdx.value -= 1;
+  chat.input = histIdx.value < 0 ? '' : chat.history[histIdx.value];
+}
+
+/** ↑ 键：光标在第一行时 recall 更早一条，否则让浏览器正常移动光标（不影响多行编辑）。 */
+function onArrowUp(e: KeyboardEvent): void {
+  if (e.isComposing) return;
+  const ta = e.target as HTMLTextAreaElement;
+  const firstLineEnd = ta.value.indexOf('\n');
+  if (ta.selectionStart > (firstLineEnd === -1 ? ta.value.length : firstLineEnd)) return;
+  e.preventDefault();
+  recallPrev();
+}
+/** ↓ 键：光标在最后一行时 recall 更新一条，否则让浏览器正常移动光标。 */
+function onArrowDown(e: KeyboardEvent): void {
+  if (e.isComposing) return;
+  const ta = e.target as HTMLTextAreaElement;
+  const lastLineStart = ta.value.lastIndexOf('\n');
+  if (ta.selectionStart <= lastLineStart) return;
+  e.preventDefault();
+  recallNext();
+}
+
 function submit(): void {
-  void chat.send(chat.input);
+  void chat.send(chat.input).then(() => {
+    histIdx.value = -1; // 发送后回到当前编辑态
+  });
+}
+
+/** 回车发送，但过滤中文输入法（IME）组词状态：组词时按回车仅用于确认候选词，不应触发发送。 */
+function onEnterKey(e: KeyboardEvent): void {
+  if (e.isComposing) return;
+  submit();
 }
 </script>
 
@@ -51,9 +96,11 @@ function submit(): void {
         v-model="chat.input"
         class="chat__input"
         rows="3"
-        placeholder="描述你想生成的场景…（回车发送）"
+        placeholder="描述你想生成的场景…（回车发送，↑↓ 切换历史输入）"
         :disabled="editor.loading"
-        @keydown.enter="submit"
+        @keydown.enter="onEnterKey"
+        @keydown.up="onArrowUp"
+        @keydown.down="onArrowDown"
       />
     </div>
   </div>
@@ -91,8 +138,15 @@ function submit(): void {
   white-space: pre-wrap;
   word-break: break-word;
 }
+.chat__msg--user {
+  align-items: flex-end;
+}
 .chat__msg--user .chat__bubble {
   background: #d9ecff;
+  text-align: right;
+}
+.chat__msg--assistant {
+  align-items: flex-start;
 }
 .chat__msg--system .chat__bubble {
   background: #fdecec;

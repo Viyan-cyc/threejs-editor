@@ -5,7 +5,7 @@
  * 为什么需要：middleware 失败时返回的 message 是面向排查的技术文案
  * （如 `main.py 退出码 1。AI3D_API_ERROR (AuthFailure.SecretKeyNotFound): …`），
  * 直接塞给用户既冗长又难懂。这里按关键字映射成一句可读原因，
- * 并补上「该对象已跳过」说明降级后果。
+ * 并明确告知降级后的视觉表现（灰色 lowPoly 占位盒体，并非目标物体本身），避免用户误以为模型已成功生成。
  */
 
 /** 混元生成失败时面向用户的提示文案前缀。 */
@@ -48,5 +48,5 @@ function reasonOf(raw: string): string {
  */
 export function summarizeHunyuanError(label: string, err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err);
-  return `${PREFIX(label)}：${reasonOf(raw)}。该对象已跳过。`;
+  return `${PREFIX(label)}：${reasonOf(raw)}。已降级为灰色 lowPoly 占位盒体（并非「${label}」本身）。`;
 }

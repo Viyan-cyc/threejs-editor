@@ -28,7 +28,7 @@ export const useEditorStore = defineStore('editor', () => {
     // 混元等对象级非致命失败（已跳过）→ 作为系统消息推到对话框，让用户知情。
     // 运行时调用 useChatStore()，避免与 chatStore（它已 import editorStore）的循环依赖在加载期触发。
     e.setWarningHandler((t) => {
-      useChatStore().push('system', t);
+      useChatStore().recordWarning(t);
     });
     e.start();
     engine.value = e;

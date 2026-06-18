@@ -21,7 +21,7 @@ import { SceneGenerationOrchestrator } from '../../ai/orchestrator/SceneGenerati
 import { applyEditOps, isSceneEditDSL } from '../../ai/orchestrator/normalizeDSL';
 import type { GenerateOptions } from '../../ai/types';
 import { DOMAINS } from '../../config/domains.config';
-import type { DomainKind, SceneDSL, SceneEditDSL, SceneObjectDSL } from '../dsl/types';
+import type { DomainKind, SceneDSL, SceneEditDSL, SceneEditOp, SceneObjectDSL } from '../dsl/types';
 import { SCENE_DSL_VERSION } from '../dsl/types';
 
 /**
@@ -150,6 +150,8 @@ export class EditorEngine {
     if (isSceneEditDSL(result)) {
       if (this.currentScene) {
         nextScene = applyEditOps(this.currentScene, result);
+        // 用本次 ops 的精确摘要替代 LLM 的 notes——edit 模式下 LLM 倾向重述整个场景（含未改对象），不可靠
+        nextScene.notes = summarizeEditOps(result.ops, this.currentScene);
         isCreate = false;
       } else {
         // 防御：编辑产物但无上一份场景（理论不发生）→ 退化为最小完整场景
@@ -358,6 +360,33 @@ function sameObject(a: SceneObjectDSL, b: SceneObjectDSL): boolean {
 /** 粗略深比较（DSL 为纯 JSON 结构，JSON 序列化相等即视为相等）。 */
 function deepEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * 把本次 edit ops 摘要为给用户看的 notes。
+ * 不信任 LLM 的 notes（edit 模式下它倾向重述整个场景、含未改对象），改由引擎按 ops 精确生成。
+ */
+function summarizeEditOps(ops: SceneEditOp[], prev: SceneDSL | null): string[] {
+  const byId = new Map<string, SceneObjectDSL>();
+  const walk = (n: SceneObjectDSL): void => {
+    if (n.id) byId.set(n.id, n);
+    for (const c of n.children ?? []) walk(c);
+  };
+  for (const n of prev?.objects ?? []) walk(n);
+
+  const out: string[] = [];
+  for (const op of ops) {
+    if (op.op === 'add') {
+      out.push(`新增「${op.object.name ?? op.object.type}」`);
+    } else if (op.op === 'update') {
+      const n = byId.get(op.id);
+      out.push(`修改「${n?.name ?? n?.type ?? op.id}」`);
+    } else if (op.op === 'remove') {
+      const n = byId.get(op.id);
+      out.push(`删除「${n?.name ?? n?.type ?? op.id}」`);
+    }
+  }
+  return out;
 }
 
 /** 防御：把编辑产物降级为最小完整 SceneDSL（无上一份场景时用）。 */
